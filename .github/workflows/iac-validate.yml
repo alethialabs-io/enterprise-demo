@@ -1,0 +1,84 @@
+name: IaC fixtures
+
+# The `iac/` modules are consumed by Alethia's BYO-IaC e2e (test/e2e/t2_byo_iac.go), which defaults
+# to this repo at iac/drift/<provider> and iac/blocked. Nothing in THIS repo used to check them, and
+# nothing in THAT repo can: it cannot see a path in a repository it does not own.
+#
+# The cost of that gap was measured. Those directories did not exist at all until 2026-08-26, and the
+# only thing that would have discovered it was a real cloud run — provision, clone, fail twenty
+# minutes in. This job is what makes the next such gap free instead.
+#
+# Free and fast: `-backend=false` needs no credentials and no state, so it validates on every push
+# without touching a cloud.
+
+on:
+  push:
+    paths: ["iac/**", ".github/workflows/iac-validate.yml"]
+  pull_request:
+    paths: ["iac/**", ".github/workflows/iac-validate.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: tofu validate (every module)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_wrapper: false
+
+      - name: Formatting
+        run: tofu fmt -check -recursive iac/
+
+      - name: Validate every module
+        run: |
+          set -euo pipefail
+          # DISCOVERED, never listed. A hand-written list is how a module gets added and silently
+          # skipped — and a fixture nobody validates is exactly what this job exists to prevent.
+          modules="$(find iac -name '*.tf' -exec dirname {} \; | sort -u)"
+          [ -n "$modules" ] || { echo "::error::no modules found under iac/ — this job would pass by checking nothing"; exit 1; }
+          for m in $modules; do
+            echo "── $m ──"
+            tofu -chdir="$m" init -backend=false -input=false >/dev/null
+            tofu -chdir="$m" validate -no-color
+          done
+
+      - name: No module may declare a backend
+        run: |
+          set -euo pipefail
+          # Alethia forces its HTTP state proxy by writing an override file. A backend declared here
+          # would be the thing it overrides, and the ABSENCE is what makes "customer state never
+          # reached the customer's own sink" checkable rather than asserted.
+          if grep -rn --include='*.tf' -E '^\s*backend\s+"' iac/; then
+            echo "::error::a module declares a backend — see iac/README.md"
+            exit 1
+          fi
+
+      - name: No drift module may emit cluster_name
+        run: |
+          set -euo pipefail
+          # That single omission keeps Alethia's whole post-apply spine off: the kubeconfig → CNI →
+          # ArgoCD → add-on tail runs only when cluster_name is non-empty. A module that gained one
+          # would silently opt into a pipeline it has no cluster for.
+          if grep -rn --include='*.tf' -E 'output\s+"cluster_name"' iac/drift/; then
+            echo "::error::a drift module emits cluster_name — see iac/README.md"
+            exit 1
+          fi
+
+      - name: Every drift module emits the two required outputs
+        run: |
+          set -euo pipefail
+          # alethia_context proves the injected TF_VAR_alethia_* actually arrived; drift_target names
+          # the resource the out-of-band mutation addresses. A module missing either fails the e2e
+          # leg late and confusingly, where it fails here in seconds.
+          fail=0
+          for m in iac/drift/*/; do
+            for out in alethia_context drift_target; do
+              grep -rqE "output\s+\"$out\"" "$m" || { echo "::error::$m does not emit $out"; fail=1; }
+            done
+          done
+          exit "$fail"
