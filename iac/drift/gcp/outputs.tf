@@ -11,16 +11,21 @@ output "drift_target" {
   value       = google_storage_bucket.drift_probe.name
 }
 
-# The module's DECLARED baseline, echoed so the harness can confirm the probe applied at a known
-# starting point before it mutates anything. Read once, immediately after apply
-# (t2_byo_iac_run_test.go): without it a later "it drifted" could mean the probe was never at
-# baseline in the first place.
+# drift_marker is the LIVE value of the probe's one mutable field, and it must read the RESOURCE
+# rather than `var.drift_marker`.
 #
-# It echoes the VARIABLE, not the live resource, and that is the point — the live value is what the
-# out-of-band mutation changes, and comparing the live value against itself would prove nothing.
+# An output wired to the VARIABLE would echo "baseline" forever: the harness asserts this equals the
+# baseline immediately after apply, and against the variable that assertion is trivially true no
+# matter what was actually applied. Reading the resource is what makes it falsifiable — it proves
+# the probe really is at a known starting point, which is the whole reason a later "it drifted"
+# means anything.
+#
+# Here that is the bucket LABEL, because this module's probe is a bucket (see main.tf for why it is
+# not project metadata). The harness mutates it with
+# `gcloud storage buckets update gs://<target> --update-labels=drift_marker=<value>`.
 output "drift_marker" {
-  description = "The baseline value the probe was applied with. The harness asserts it is \"baseline\"."
-  value       = var.drift_marker
+  description = "LIVE value of the probe's drift marker, read back from the resource."
+  value       = google_storage_bucket.drift_probe.labels["drift_marker"]
 }
 
 # No cluster_name output — see iac/drift/hetzner/outputs.tf for why that omission is load-bearing.

@@ -1,0 +1,13 @@
+# Provider downloads — never committed.
+.terraform/
+
+# Deliberately NOT committed. `.terraform.lock.hcl` records per-PLATFORM package hashes, so a
+# lock generated on a maintainer's darwin_arm64 laptop makes `tofu init` fail on the runner's
+# linux_amd64 with "provider does not have a package for the current platform". The runner
+# inits these modules itself; let it resolve providers for the platform it is actually on.
+.terraform.lock.hcl
+
+# There is no backend here (the runner injects a state-proxy override), so a local state file
+# only ever appears by accident — but if it does, it must not be published.
+*.tfstate
+*.tfstate.*
