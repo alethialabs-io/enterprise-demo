@@ -3,10 +3,12 @@ output "alethia_context" {
   value       = "${var.alethia_project}/${var.alethia_environment}"
 }
 
-# The metadata KEY — the harness runs `gcloud compute project-info add-metadata --metadata <target>=<value>`.
+# The bucket NAME — the harness runs
+# `gcloud storage buckets update gs://<target> --update-labels=drift_marker=<value>`.
+# `--update-labels` merges, so `managed_by` survives the out-of-band mutation.
 output "drift_target" {
-  description = "The project-metadata key the harness mutates out of band to induce drift."
-  value       = google_compute_project_metadata_item.drift_probe.key
+  description = "The bucket whose drift_marker label the harness mutates out of band to induce drift."
+  value       = google_storage_bucket.drift_probe.name
 }
 
 # No cluster_name output — see iac/drift/hetzner/outputs.tf for why that omission is load-bearing.
