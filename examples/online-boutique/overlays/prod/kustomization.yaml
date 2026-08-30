@@ -4,18 +4,14 @@
 # The namespace here must match the namespace the environment declares in Alethia. A mismatch is
 # refused by the tenant AppProject (`tenant-<project>-<namespace>`) rather than deployed into the
 # wrong place, so these two are one setting in two files.
-# NO namespace.yaml here, deliberately. Alethia creates the destination namespace for every
-# placement mode — `dedicated` and `vcluster` Applications carry CreateNamespace=true, and a
-# `namespace` placement has already created a HARDENED one before the Application exists, which
-# is why its Application sets CreateNamespace=false and its tenant AppProject ships
-# `clusterResourceWhitelist: []`. An overlay that declares its own Namespace is refused there
-# ("one or more synchronization tasks are not valid") — and rightly: a tenant that can create
-# cluster-scoped objects is not a tenant. The `namespace:` field below still stamps every
-# resource into the right place.
+# This tier DOES declare its namespace (namespace.yaml) because it is a DEDICATED placement — it
+# owns the Fabric, runs under the cluster-scoped `apps` AppProject, and its Application carries no
+# `destination.namespace` for ArgoCD to create. The shared tiers must not; see any of them.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: boutique-prod
 resources:
+  - namespace.yaml
   - ../../base
 patches:
   # Production carries redundancy the cheaper tiers do not.

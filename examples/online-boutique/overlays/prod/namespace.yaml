@@ -1,0 +1,14 @@
+# The prod tier is a DEDICATED placement: its environment owns the Fabric, and its Application runs
+# under the `apps` AppProject, which permits cluster-scoped resources. It also has no
+# `destination.namespace`, so ArgoCD's CreateNamespace has nothing to create — this file is what
+# brings the namespace into being.
+#
+# The shared tiers deliberately do NOT have this file. A `namespace` or `vcluster` placement is a
+# TENANT: Alethia creates its namespace (hardened, in the namespace case) and its AppProject ships
+# `clusterResourceWhitelist: []`, so a Namespace declared in the overlay is refused. The asymmetry
+# is not an inconsistency — it is the authority difference between owning a cluster and being placed
+# onto one.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: boutique-prod
