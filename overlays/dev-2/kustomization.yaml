@@ -1,0 +1,20 @@
+# Development tier 2 — a NAMESPACE placement, the cheapest rung of the isolation ladder. It shares
+# the Fabric's cluster and control plane; only the namespace and its AppProject separate it from the
+# other tiers.
+#
+# The namespace must match the one the environment declares in Alethia, or the tenant AppProject
+# refuses the sync.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: boutique-dev-2
+resources:
+  - namespace.yaml
+  - ../../base
+patches:
+  # Three dev tiers land the twelve services three times over. The load generator is pure synthetic
+  # CPU, so it is off here — the tier stays fully browsable, and the node count stays honest.
+  - target: { kind: Deployment, name: loadgenerator }
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 0
