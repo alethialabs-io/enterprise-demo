@@ -1,8 +1,15 @@
+# NO namespace.yaml here, deliberately. Alethia creates the destination namespace for every
+# placement mode — `dedicated` and `vcluster` Applications carry CreateNamespace=true, and a
+# `namespace` placement has already created a HARDENED one before the Application exists, which
+# is why its Application sets CreateNamespace=false and its tenant AppProject ships
+# `clusterResourceWhitelist: []`. An overlay that declares its own Namespace is refused there
+# ("one or more synchronization tasks are not valid") — and rightly: a tenant that can create
+# cluster-scoped objects is not a tenant. The `namespace:` field below still stamps every
+# resource into the right place.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: boutique-staging
 resources:
-  - namespace.yaml
   - ../../base
 patches:
   - target: { kind: Deployment, name: frontend }
